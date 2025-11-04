@@ -1,81 +1,116 @@
-const path = require("path");
-const express = require("express");
-const cookieParser = require("cookie-parser");
-const mongoose = require("mongoose");
-const session = require("express-session");
-const mongoDBStore = require("connect-mongodb-session")(session);
-const csrf = require("tiny-csrf");
-const flash = require("connect-flash");
-const multer = require("multer");
+const path = require('path');
+const fs = require('fs');
 
-const errorController = require("./controllers/error");
-const adminController = require("./controllers/admin");
-const authController = require("./controllers/auth");
-const adminRoutes = require("./routes/admin");
-const shopRoutes = require("./routes/shop");
-const authRoutes = require("./routes/auth");
-const files = require("./util/file");
+const express = require('express');
+const bodyParser = require('body-parser');
+const mongoose = require('mongoose');
+const session = require('express-session');
+const MongoDBStore = require('connect-mongodb-session')(session);
+const csrf = require('csurf');
+const flash = require('connect-flash');
+const multer = require('multer');
 
+const errorController = require('./controllers/error');
+const User = require('./models/user');
 
-const MONGODB_URI = "mongodb://localhost:27017/pb_2025_14K2_twardy";
-mongoose.set("strictQuery", false);
-const store = new mongoDBStore({
-  uri: MONGODB_URI,
-  collection: "sessions",
-});
+const MONGODB_URI = 'mongodb://localhost:27017/pb_2025_14K2_twardy';
 
 const app = express();
+const store = new MongoDBStore({
+  uri: MONGODB_URI,
+  collection: 'sessions',
+});
+const csrfProtection = csrf();
 
-app.set("view engine", "ejs");
-app.set("views", "views");
+const fileStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, 'images');
+  },
+  filename: (req, file, cb) => {
+    cb(null, new Date().toISOString().replace(/:/g, '-') + '-' + file.originalname);
+  }
+});
 
-app.use(express.urlencoded({ extended: false }));
-app.use("/images", express.static(path.join(__dirname, "images")));
-app.use(express.static(path.join(__dirname, "public")));
+const fileFilter = (req, file, cb) => {
+  if (
+    file.mimetype === 'image/png' ||
+    file.mimetype === 'image/jpg' ||
+    file.mimetype === 'image/jpeg'
+  ) {
+    cb(null, true);
+  } else {
+    cb(null, false);
+  }
+};
 
-app.use(
-  multer({ storage: files.fileStorage, fileFilter: files.fileFilter }).single("image")
-);
+app.set('view engine', 'ejs');
+app.set('views', 'views');
 
-app.use(cookieParser("cookie-parser-secret"));
+const adminRoutes = require('./routes/admin');
+const shopRoutes = require('./routes/shop');
+const authRoutes = require('./routes/auth');
 
+app.use(bodyParser.urlencoded({ extended: false }));
+app.use(multer({ storage: fileStorage, fileFilter: fileFilter }).single('image'));
+app.use(express.static(path.join(__dirname, 'public')));
+app.use('/images', express.static(path.join(__dirname, 'images')));
 app.use(
   session({
-    secret: "our-very-important-session-secret-of-backend-programming",
+    secret: 'my secret',
     resave: false,
     saveUninitialized: false,
-    store: store,
+    store: store
   })
 );
 
-app.use(csrf("1234567ThisIsSecret9876543210PAI",
-  ["POST","DELETE","PUT","PATCH"], ["/logout",/\/product(\/.*)?/i])); 
-
-app.use((req, res, next) => {
-  res.locals.isAuthenticated = req.session.isAuthenticated;
-  res.locals.cToken = req.csrfToken();
-  res.locals.path = "/";
-  next(); 
-});
-
+app.use(csrfProtection);
 app.use(flash());
 
-app.use("/admin", adminRoutes);
+app.use((req, res, next) => {
+  res.locals.isAuthenticated = req.session.isLoggedIn;
+  res.locals.csrfToken = req.csrfToken();
+  next();
+});
+
+// START KRYTYCZNA SEKCJA: ŁADOWANIE OBIEKTU UŻYTKOWNIKA DO REQ.USER
+app.use(async (req, res, next) => {
+  if (!req.session.user) {
+    return next();
+  }
+  try {
+    const user = await User.findById(req.session.user._id);
+    if (!user) {
+      return next();
+    }
+    req.user = user;
+    next();
+  } catch (err) {
+    next(new Error(err));
+  }
+});
+// KONIEC KRYTYCZNEJ SEKCJI
+
+app.use('/admin', adminRoutes);
 app.use(shopRoutes);
 app.use(authRoutes);
 
+app.get('/500', errorController.get500);
+
 app.use(errorController.get404);
-app.use(errorController.get500);
 
-(async () => {
-  try {
-    await mongoose.connect(MONGODB_URI, { });
-    app.listen(33333, () => {
-      console.log('Server is running on port 33333');
-    });
-  }catch (err) {
-    console.error(err);
-  }
-})();
+app.use((error, req, res, next) => {
+  res.status(500).render('500', {
+    pageTitle: 'Error!',
+    path: '/500',
+    isAuthenticated: req.session.isLoggedIn
+  });
+});
 
-
+mongoose
+  .connect(MONGODB_URI)
+  .then(result => {
+    app.listen(3000);
+  })
+  .catch(err => {
+    console.log(err);
+  });
