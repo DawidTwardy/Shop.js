@@ -1,194 +1,153 @@
-const fs = require('fs');
-const path = require('path');
-const PDFdoc = require('pdfkit');
-
 const Product = require('../models/product');
-const Order = require('../models/order');
-const User = require('../models/user');
+
+const ITEMS_PER_PAGE = 3;
+
+// DODANO STAŁE DLA KONTEKSTU WIDOKU /views/shop/index.ejs
+const STUDY_LEVEL = 'I (Inżynierski)';
+const CLASSES_NAME = 'Programowanie back-end';
 
 exports.getProducts = async (req, res, next) => {
-  try {
-    const products = await Product.find().limit(6);
-    res.render('shop/product-list', {
-      prods: products,
-      pageTitle: 'All Products',
-      path: '/products',
-    });
-  } catch (err) {
-    const error = new Error(err);
-    error.httpStatusCode = 500;
-    return next(error);
-  }
-};
+    try {
+        const page = +req.query.page || 1;
+        const totalItems = await Product.find().countDocuments();
+        const products = await Product.find()
+            .skip((page - 1) * ITEMS_PER_PAGE)
+            .limit(ITEMS_PER_PAGE);
 
-exports.getProduct = async (req, res, next) => {
-  const prodId = req.params.productId;
-  try {
-    const product = await Product.findById(prodId);
-    res.render('shop/product-detail', {
-      product: product,
-      pageTitle: product.title,
-      path: '/products',
-    });
-  } catch (err) {
-    const error = new Error(err);
-    error.httpStatusCode = 500;
-    return next(error);
-  }
+        res.render('shop/product-list', {
+            prods: products,
+            pageTitle: 'Products',
+            path: '/products',
+            currentPage: page,
+            hasNextPage: ITEMS_PER_PAGE * page < totalItems,
+            hasPreviousPage: page > 1,
+            nextPage: page + 1,
+            previousPage: page - 1,
+            lastPage: Math.ceil(totalItems / ITEMS_PER_PAGE),
+        });
+    } catch (err) {
+        const error = new Error(err);
+        error.httpStatusCode = 500;
+        return next(error);
+    }
 };
 
 exports.getIndex = async (req, res, next) => {
-  try {
-    const products = await Product.find().limit(6);
-    res.render('shop/index', {
-      prods: products,
-      pageTitle: 'Shop',
-      path: '/',
-      studyLevel: 'Informatyka Stosowana, M-07',
-      classesName: 'Programowanie back-end',
-    });
-  } catch (err) {
-    const error = new Error(err);
-    error.httpStatusCode = 500;
-    return next(error);
-  }
+    try {
+        const page = +req.query.page || 1;
+        const totalItems = await Product.find().countDocuments();
+        const products = await Product.find()
+            .skip((page - 1) * ITEMS_PER_PAGE)
+            .limit(ITEMS_PER_PAGE);
+
+        res.render('shop/index', {
+            prods: products,
+            pageTitle: 'Shop',
+            path: '/',
+            currentPage: page,
+            hasNextPage: ITEMS_PER_PAGE * page < totalItems,
+            hasPreviousPage: page > 1,
+            nextPage: page + 1,
+            previousPage: page - 1,
+            lastPage: Math.ceil(totalItems / ITEMS_PER_PAGE),
+            // PRZEKAZANIE BRAKUJĄCYCH ZMIENNYCH DLA index.ejs
+            studyLevel: STUDY_LEVEL,
+            classesName: CLASSES_NAME,
+        });
+    } catch (err) {
+        const error = new Error(err);
+        error.httpStatusCode = 500;
+        return next(error);
+    }
+};
+
+exports.getProduct = async (req, res, next) => {
+    try {
+        const prodId = req.params.productId;
+        const product = await Product.findById(prodId);
+        res.render('shop/product-detail', {
+            product: product,
+            pageTitle: product.title,
+            path: '/products'
+        });
+    } catch (err) {
+        const error = new Error(err);
+        error.httpStatusCode = 500;
+        return next(error);
+    }
 };
 
 exports.getCart = async (req, res, next) => {
-  try {
-    const user = await User.findOne({ _id: req.session.user._id });
-    const produser = await user.populate('cart.items.productId');
-    const products = produser.cart.items;
-    res.render('shop/cart', {
-      path: '/cart',
-      pageTitle: 'Your Cart',
-      products: products,
-    });
-  } catch (err) {
-    const error = new Error(err);
-    error.httpStatusCode = 500;
-    return next(error);
-  }
+    try {
+        // POPRAWKA: Usunięto .execPopulate(), używając await na populate()
+        const user = await req.user.populate('cart.items.productId'); 
+        const products = user.cart.items;
+        res.render('shop/cart', {
+            path: '/cart',
+            pageTitle: 'Your Cart',
+            products: products
+        });
+    } catch (err) {
+        const error = new Error(err);
+        error.httpStatusCode = 500;
+        return next(error);
+    }
 };
 
 exports.postCart = async (req, res, next) => {
-  const prodId = req.body.productId;
-  try {
-    const product = await Product.findById(prodId);
-    if (!product) {
-      throw new Error('Product not found.');
+    try {
+        const prodId = req.body.productId;
+        const product = await Product.findById(prodId);
+        await req.user.addToCart(product);
+        res.redirect('/cart');
+    } catch (err) {
+        const error = new Error(err);
+        error.httpStatusCode = 500;
+        return next(error);
     }
-    const user = await User.findOne({ _id: req.session.user._id });
-    await user.addToCart(product);
-    res.redirect('/cart');
-  } catch (err) {
-    const error = new Error(err);
-    error.httpStatusCode = 500;
-    return next(error);
-  }
 };
 
 exports.postCartDeleteProduct = async (req, res, next) => {
-  const prodId = req.body.productId;
-  try {
-    const user = await User.findOne({ _id: req.session.user._id });
-    await user.removeFromCart(prodId);
-    res.redirect('/cart');
-  } catch (err) {
-    const error = new Error(err);
-    error.httpStatusCode = 500;
-    return next(error);
-  }
-};
-
-exports.postOrder = async (req, res, next) => {
-  try {
-    const user = await User.findOne({ _id: req.session.user._id });
-    const produser = await user.populate('cart.items.productId');
-    const products = produser.cart.items.map((i) => {
-      return { quantity: i.quantity, product: { ...i.productId._doc } };
-    });
-    const order = new Order({
-      user: { email: user.email, userId: user._id },
-      products: products,
-    });
-    await order.save();
-    await user.clearCart();
-    res.redirect('/orders');
-  } catch (err) {
-    const error = new Error(err);
-    error.httpStatusCode = 500;
-    return next(error);
-  }
-};
-
-exports.getOrders = (req, res, next) => {
-  Order.find({ 'user.userId': req.session.user._id })
-    .then((orders) => {
-      res.render('shop/orders', {
-        path: '/orders',
-        pageTitle: 'Orders',
-        orders: orders,
-      });
-    })
-    .catch((err) => {
-      const error = new Error(err);
-      error.httpStatusCode = 500;
-      return next(error);
-    });
-};
-
-exports.getInvoice = async (req, res, next) => {
-  const orderId = req.params.orderId;
-  try {
-    const order = await Order.findById(orderId);
-    if (!order) {
-      throw new Error('Order does not exist.');
+    try {
+        const prodId = req.body.productId;
+        await req.user.removeFromCart(prodId);
+        res.redirect('/cart');
+    } catch (err) {
+        const error = new Error(err);
+        error.httpStatusCode = 500;
+        return next(error);
     }
-    const invoiceName = 'invoice-' + orderId + '.pdf';
-    const invoicePath = path.join('data', 'invoices', invoiceName);
-
-    const pdfDoc = new PDFdoc();
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', 'inline; filename="' + invoiceName + '"');
-
-    pdfDoc.pipe(fs.createWriteStream(invoicePath));
-    pdfDoc.pipe(res);
-
-    pdfDoc.fontSize(24).text('FAKTURA', { underline: true });
-    pdfDoc.text('-----------------------');
-
-    let totalPrice = 0;
-    order.products.forEach((prod) => {
-      totalPrice += prod.quantity * prod.product.price;
-      pdfDoc
-        .fontSize(14)
-        .text(
-          prod.product.title +
-            ': ' +
-            prod.quantity +
-            ' x ' +
-            prod.product.price +
-            ' zł = ' +
-            (prod.quantity * prod.product.price).toFixed(2) +
-            ' zł'
-        );
-    });
-
-    pdfDoc.text('-----');
-    pdfDoc.fontSize(20).text('RAZEM: ' + totalPrice.toFixed(2) + ' zł');
-
-    pdfDoc.end();
-  } catch (err) {
-    const error = new Error(err);
-    error.httpStatusCode = 500;
-    return next(error);
-  }
 };
 
 exports.getCheckout = (req, res, next) => {
-  res.render('shop/checkout', {
-    path: '/checkout',
-    pageTitle: 'Checkout',
-  });
+    res.render('shop/checkout', {
+        path: '/checkout',
+        pageTitle: 'Checkout'
+    });
+};
+
+exports.postOrder = async (req, res, next) => {
+    try {
+        await req.user.addOrder();
+        res.redirect('/orders');
+    } catch (err) {
+        const error = new Error(err);
+        error.httpStatusCode = 500;
+        return next(error);
+    }
+};
+
+exports.getOrders = async (req, res, next) => {
+    try {
+        const orders = await req.user.getOrders();
+        res.render('shop/orders', {
+            path: '/orders',
+            pageTitle: 'Your Orders',
+            orders: orders
+        });
+    } catch (err) {
+        const error = new Error(err);
+        error.httpStatusCode = 500;
+        return next(error);
+    }
 };

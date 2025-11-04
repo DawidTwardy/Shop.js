@@ -1,10 +1,8 @@
-const path = require('path');
 const express = require('express');
 const { body } = require('express-validator');
 
 const adminController = require('../controllers/admin');
 const isAuth = require('../middleware/is-auth');
-const fileHelper = require('../util/file');
 
 const router = express.Router();
 
@@ -49,9 +47,6 @@ router.post(
   adminController.postEditProduct
 );
 
-// /admin/delete-product => DELETE
-// Ta trasa jest wywoływana przez XHR i musi wskazywać bezpośrednio na funkcję kontrolera.
-// Właśnie ten wiersz prawdopodobnie miał błąd składni, który powodował awarię serwera.
-router.delete('/product/:productId', isAuth, adminController.deleteProduct);
+router.post('/delete-product', isAuth, adminController.postDeleteProduct);
 
 module.exports = router;

@@ -1,5 +1,3 @@
-const path = require('path');
-
 const express = require('express');
 
 const shopController = require('../controllers/shop');
@@ -23,8 +21,6 @@ router.post('/create-order', isAuth, shopController.postOrder);
 
 router.get('/orders', isAuth, shopController.getOrders);
 
-router.get('/orders/:orderId', isAuth, shopController.getInvoice);
+router.get('/checkout', isAuth, shopController.getCheckout);
 
-router.get('/checkout', shopController.getCheckout);
-
-module.exports = router;    
+module.exports = router;
