@@ -111,7 +111,7 @@ exports.postEditProduct = (req, res, next) => {
   const updatedDesc = req.body.description;
 
   const errors = validationResult(req);
-
+  
   if (!errors.isEmpty()) {
     return res.status(422).render('admin/edit-product', {
       pageTitle: 'Edit Product',
@@ -120,7 +120,7 @@ exports.postEditProduct = (req, res, next) => {
       hasError: true,
       product: {
         title: updatedTitle,
-        imageUrl: image ? image.path : req.body.oldImageUrl,
+        imageUrl: req.body.oldImageUrl, 
         price: updatedPrice,
         description: updatedDesc,
         _id: prodId
@@ -140,7 +140,6 @@ exports.postEditProduct = (req, res, next) => {
       product.description = updatedDesc;
       
       if (image) {
-        // Logika usuwania starego pliku powinna być tutaj
         product.imageUrl = image.path;
       }
       
@@ -178,7 +177,6 @@ exports.postDeleteProduct = (req, res, next) => {
       if (!product) {
         return next(new Error('Product not found.'));
       }
-      // Logika usuwania pliku powinna być tutaj
       return Product.deleteOne({ _id: prodId, userId: req.user._id });
     })
     .then(() => {
