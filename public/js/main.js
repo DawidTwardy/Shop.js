@@ -2,15 +2,20 @@ const backdrop = document.querySelector('.backdrop');
 const sideDrawer = document.querySelector('.mobile-nav');
 const menuToggle = document.querySelector('#side-menu-toggle');
 
+function menuToggleHandler() {
+    sideDrawer.classList.toggle('open');
+    backdrop.classList.toggle('open');
+}
+
 function backdropClickHandler() {
-  backdrop.style.display = 'none';
-  sideDrawer.classList.remove('open');
+    sideDrawer.classList.remove('open');
+    backdrop.classList.remove('open');
 }
 
-function menuToggleClickHandler() {
-  backdrop.style.display = 'block';
-  sideDrawer.classList.add('open');
+if (backdrop) {
+    backdrop.addEventListener('click', backdropClickHandler);
 }
 
-backdrop.addEventListener('click', backdropClickHandler);
-menuToggle.addEventListener('click', menuToggleClickHandler);
+if (menuToggle) {
+    menuToggle.addEventListener('click', menuToggleHandler);
+}

@@ -4,7 +4,7 @@
 </head>
 
 <body>
-   <%- include('../includes/navigation.ejs') %>
+    <%- include('../includes/navigation.ejs') %>
 
     <main>
         <% if (errorMessage) { %>
@@ -14,7 +14,7 @@
             <div class="form-control">
                 <label for="email">E-Mail</label>
                 <input 
-                    class="<%= validationErrors.find(e=>e.param==='email')?'invalid':''%>"
+                    class="<%= validationErrors.find(e => e.path === 'email') ? 'invalid' : '' %>"
                     type="email" 
                     name="email" 
                     id="email" 
@@ -23,13 +23,13 @@
             <div class="form-control">
                 <label for="password">Password</label>
                 <input 
-                    class="<%= validationErrors.find(e => e.param === 'password') ? 'invalid' : '' %>"
+                    class="<%= validationErrors.find(e => e.path === 'password') ? 'invalid' : '' %>"
                     type="password" 
                     name="password" 
                     id="password" 
                     value="<%= oldInput.password %>">
             </div>
-            <input type="hidden" name="_csrf" value="<%= cToken %>">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
             <button class="btn" type="submit">Login</button>
         </form>
         <div class="centered">

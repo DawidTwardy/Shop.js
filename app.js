@@ -72,7 +72,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// START KRYTYCZNA SEKCJA: ŁADOWANIE OBIEKTU UŻYTKOWNIKA DO REQ.USER
 app.use(async (req, res, next) => {
   if (!req.session.user) {
     return next();
@@ -88,7 +87,6 @@ app.use(async (req, res, next) => {
     next(new Error(err));
   }
 });
-// KONIEC KRYTYCZNEJ SEKCJI
 
 app.use('/admin', adminRoutes);
 app.use(shopRoutes);
@@ -102,15 +100,16 @@ app.use((error, req, res, next) => {
   res.status(500).render('500', {
     pageTitle: 'Error!',
     path: '/500',
-    isAuthenticated: req.session.isLoggedIn
+    isAuthenticated: req.session.isLoggedIn,
+    errorMessage: error.message
   });
 });
 
 mongoose
   .connect(MONGODB_URI)
-  .then(result => {
-    app.listen(3000);
-  })
+  .then(result => {})
   .catch(err => {
     console.log(err);
   });
+
+app.listen(33333);
