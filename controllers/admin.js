@@ -129,29 +129,29 @@ exports.getProducts = (req, res, next) => {
     });
 };
 
-exports.deleteProduct = (req, res, next) => {
+exports.deleteProduct = async (req, res, next) => {
   const prodId = req.params.productId;
-  
-  Product.findOne({ _id: prodId, userId: req.user._id })
-    .then(product => {
-      if (!product) {
-        // Jeśli produkt nie istnieje LUB użytkownik nie jest jego właścicielem, zwracamy 404/403
-        return res.status(404).json({ message: 'Product not found or not authorized.' });
-      }
+  try {
+    // Sprawdzamy, czy produkt istnieje i należy do użytkownika
+    const product = await Product.findOne({ _id: prodId, userId: req.user._id }); 
 
-      // Usuwamy plik (bezpieczna, nieblokująca operacja)
-      fileHelper.deleteFile(product.imageUrl);
+    if (!product) {
+      return res.status(404).json({ message: 'Product not found or not authorized.' }); 
+    }
 
-      // Zwracamy Promise dla operacji usunięcia z bazy
-      return Product.deleteOne({ _id: prodId, userId: req.user._id });
-    })
-    .then(() => {
-      // Jeśli usunięcie z bazy się powiodło
-      res.status(200).json({ message: 'Success!' });
-    })
-    .catch(err => {
-      // Obsługa błędu Mongoose lub innego błędu w łańcuchu
-      console.log(err);
-      res.status(500).json({ message: 'Deleting product failed.' });
+    // Usuwamy plik, funkcja deleteFile jest asynchronicznie bezpieczna
+    await fileHelper.deleteFile(product.imageUrl);
+
+    // Usuwamy produkt z bazy
+    await Product.deleteOne({ _id: prodId }); 
+
+    res.status(200).json({
+      message: 'Success!'
     });
+  } catch (err) {
+    // Łapiemy błędy, np. błąd bazy danych
+    res.status(500).json({
+      message: 'Deleting product failed.'
+    });
+  }
 };

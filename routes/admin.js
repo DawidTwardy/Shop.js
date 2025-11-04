@@ -1,33 +1,33 @@
+const path = require('path');
 const express = require('express');
-const { check, body } = require('express-validator');
+const { body } = require('express-validator');
 
 const adminController = require('../controllers/admin');
 const isAuth = require('../middleware/is-auth');
+const fileHelper = require('../util/file');
 
 const router = express.Router();
 
+// /admin/add-product => GET
 router.get('/add-product', isAuth, adminController.getAddProduct);
 
+// /admin/products => GET
 router.get('/products', isAuth, adminController.getProducts);
 
+// /admin/add-product => POST
 router.post(
   '/add-product',
+  isAuth,
   [
     body('title')
       .isString()
       .isLength({ min: 3 })
-      .trim()
-      .withMessage('Title must be a text with a minimum length of 3 characters.'),
-    body('price')
-      .isFloat()
-      .withMessage('Price must be a number.'),
+      .trim(),
+    body('price').isFloat(),
     body('description')
-      .isString()
       .isLength({ min: 5, max: 400 })
       .trim()
-      .withMessage('Description must be between 5 and 400 characters long.'),
   ],
-  isAuth,
   adminController.postAddProduct
 );
 
@@ -35,26 +35,23 @@ router.get('/edit-product/:productId', isAuth, adminController.getEditProduct);
 
 router.post(
   '/edit-product',
+  isAuth,
   [
     body('title')
       .isString()
       .isLength({ min: 3 })
-      .trim()
-      .withMessage('Title must be a text with a minimum length of 3 characters.'),
-    body('price')
-      .isFloat()
-      .withMessage('Price must be a number.'),
+      .trim(),
+    body('price').isFloat(),
     body('description')
-      .isString()
       .isLength({ min: 5, max: 400 })
       .trim()
-      .withMessage('Description must be between 5 and 400 characters long.'),
   ],
-  isAuth,
   adminController.postEditProduct
 );
 
-// To jest krytyczna trasa, która musi pasować do Fetch: /admin/product/ID
-router.delete('/product/:productId', isAuth, adminController.postDeleteProduct);
+// /admin/delete-product => DELETE
+// Ta trasa jest wywoływana przez XHR i musi wskazywać bezpośrednio na funkcję kontrolera.
+// Właśnie ten wiersz prawdopodobnie miał błąd składni, który powodował awarię serwera.
+router.delete('/product/:productId', isAuth, adminController.deleteProduct);
 
 module.exports = router;
